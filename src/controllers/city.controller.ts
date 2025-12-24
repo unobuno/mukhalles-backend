@@ -142,7 +142,7 @@ export const updateCity = async (
   }
 };
 
-// Delete city (admin only) - soft delete by setting isActive to false
+// Delete city (admin only) - permanently removes the city
 export const deleteCity = async (
   req: AuthRequest,
   res: Response
@@ -150,7 +150,7 @@ export const deleteCity = async (
   try {
     const { id } = req.params;
 
-    const city = await City.findOne({ id });
+    const city = await City.findOneAndDelete({ id });
     if (!city) {
       res.status(404).json({
         success: false,
@@ -159,10 +159,7 @@ export const deleteCity = async (
       return;
     }
 
-    city.isActive = false;
-    await city.save();
-
-    logger.info(`City deleted: ${id} by user: ${req.user?.userId}`);
+    logger.info(`City deleted permanently: ${id} by user: ${req.user?.userId}`);
 
     res.status(200).json({
       success: true,

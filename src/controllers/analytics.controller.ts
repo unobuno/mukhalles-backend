@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { Office, Review, Analytics } from "../models";
+import { Business, Review, Analytics } from "../models";
 import { AuthRequest } from "../types";
 import logger from "../utils/logger";
 
@@ -10,19 +10,19 @@ export const getCompanyAnalytics = async (
   try {
     const { id } = req.params;
 
-    const office = await Office.findOne({
+    const business = await Business.findOne({
       _id: id,
-      companyId: req.user?.userId,
+      ownerId: req.user?.userId,
     });
 
-    if (!office) {
+    if (!business) {
       return res.status(404).json({
         success: false,
-        message: "Office not found",
+        message: "Business not found",
       });
     }
 
-    const reviews = await Review.find({ officeId: id, isApproved: true })
+    const reviews = await Review.find({ businessId: id, isApproved: true })
       .sort({ createdAt: -1 })
       .limit(10)
       .populate("userId", "individualProfile.fullName")
@@ -33,8 +33,8 @@ export const getCompanyAnalytics = async (
     const viewsByDay = await Analytics.aggregate([
       {
         $match: {
-          metric: "office_views",
-          "dimensions.officeId": office._id,
+          metric: "business_views",
+          "dimensions.businessId": business._id,
           timestamp: { $gte: thirtyDaysAgo },
         },
       },
@@ -53,7 +53,7 @@ export const getCompanyAnalytics = async (
       {
         $match: {
           metric: "contact_clicks",
-          "dimensions.officeId": office._id,
+          "dimensions.businessId": business._id,
           timestamp: { $gte: thirtyDaysAgo },
         },
       },
@@ -72,22 +72,22 @@ export const getCompanyAnalytics = async (
       success: true,
       data: {
         overview: {
-          profileViews: office.stats.profileViews,
-          contactClicks: office.stats.contactClicks,
-          bookmarks: office.stats.bookmarks,
-          reviewsCount: office.ratingCount,
-          averageRating: office.rating,
+          profileViews: business.stats.profileViews,
+          contactClicks: business.stats.contactClicks,
+          bookmarks: business.stats.bookmarks,
+          reviewsCount: business.ratingCount,
+          averageRating: business.rating,
         },
         trends: {
           viewsByDay,
           contactsByDay,
         },
-        popularServices: office.services.slice(0, 5),
+        popularServices: business.services.slice(0, 5),
         recentReviews: reviews,
       },
     });
   } catch (error) {
-    logger.error("Get company analytics error:", error);
+    logger.error("Get business analytics error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to get analytics",
@@ -130,7 +130,7 @@ export const getPlatformAnalytics = async (req: AuthRequest, res: Response) => {
     const topCities = await Analytics.aggregate([
       {
         $match: {
-          metric: "office_views",
+          metric: "business_views",
           timestamp: { $gte: startDate },
         },
       },

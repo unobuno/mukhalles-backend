@@ -11,18 +11,30 @@ export const getNotifications = async (req: AuthRequest, res: Response) => {
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
-    const query: any = { userId: req.user?.userId };
-    if (type && type !== "all") query.type = type;
-    if (isRead !== undefined) query.isRead = isRead === "true";
+    // Query for user's personal notifications AND broadcast notifications
+    const baseQuery: any = {
+      $or: [
+        { userId: req.user?.userId, targetAudience: "individual" }, // Personal
+        { targetAudience: "all" }, // Broadcast to all
+        { targetAudience: "roles", targetRoles: req.user?.role }, // Role-based
+      ],
+    };
+
+    // Add optional filters
+    if (type && type !== "all") baseQuery.type = type;
+    if (isRead !== undefined) baseQuery.isRead = isRead === "true";
 
     const [notifications, total, unreadCount] = await Promise.all([
-      Notification.find(query)
+      Notification.find(baseQuery)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
         .lean(),
-      Notification.countDocuments(query),
-      Notification.countDocuments({ userId: req.user?.userId, isRead: false }),
+      Notification.countDocuments(baseQuery),
+      Notification.countDocuments({
+        ...baseQuery,
+        isRead: false,
+      }),
     ]);
 
     res.status(200).json({
@@ -53,10 +65,17 @@ export const markAsRead = async (
 ): Promise<Response> => {
   try {
     const { id } = req.params;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
 
+    // Find notification that user has access to (individual, role-based, or broadcast)
     const notification = await Notification.findOne({
       _id: id,
-      userId: req.user?.userId,
+      $or: [
+        { userId, targetAudience: "individual" },
+        { targetAudience: "all" },
+        { targetAudience: "roles", targetRoles: userRole },
+      ],
     });
 
     if (!notification) {
@@ -85,8 +104,19 @@ export const markAsRead = async (
 
 export const markAllAsRead = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
+
+    // Mark all accessible notifications as read
     await Notification.updateMany(
-      { userId: req.user?.userId, isRead: false },
+      {
+        isRead: false,
+        $or: [
+          { userId, targetAudience: "individual" },
+          { targetAudience: "all" },
+          { targetAudience: "roles", targetRoles: userRole },
+        ],
+      },
       { isRead: true, readAt: new Date() }
     );
 

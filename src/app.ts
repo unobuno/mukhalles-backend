@@ -10,12 +10,14 @@ import path from "path";
 import logger from "./utils/logger";
 import errorHandler from "./middleware/errorHandler";
 import notFoundHandler from "./middleware/notFoundHandler";
+import urlTransformer from "./middleware/urlTransformer";
 
 // Import routes
 import authRoutes from "./routes/auth.routes";
+import adminAuthRoutes from "./routes/adminAuth.routes";
 import userRoutes from "./routes/user.routes";
 import companyRoutes from "./routes/company.routes";
-import officeRoutes from "./routes/office.routes";
+import businessRoutes from "./routes/business.routes";
 import reviewRoutes from "./routes/review.routes";
 import bookmarkRoutes from "./routes/bookmark.routes";
 import notificationRoutes from "./routes/notification.routes";
@@ -25,11 +27,18 @@ import searchRoutes from "./routes/search.routes";
 import analyticsRoutes from "./routes/analytics.routes";
 import categoryRoutes from "./routes/category.routes";
 import cityRoutes from "./routes/city.routes";
+import adminSettingsRoutes from "./routes/adminSettings.routes";
+import adminNotificationsRoutes from "./routes/adminNotifications.routes";
+import contactRoutes from "./routes/contact.routes";
 
 const app: Application = express();
 
 // Security middleware
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 app.use(
   cors({
     origin: process.env.ALLOWED_ORIGINS?.split(",") || "*",
@@ -61,10 +70,10 @@ if (process.env.NODE_ENV === "development") {
   );
 }
 
-// Serve static files (uploads)
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-// Health check endpoint
+app.use(urlTransformer);
+
 app.get("/health", (_req, res) => {
   res.status(200).json({
     success: true,
@@ -75,9 +84,10 @@ app.get("/health", (_req, res) => {
 
 // API Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/company", companyRoutes);
-app.use("/api/offices", officeRoutes);
+app.use("/api/businesses", businessRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
 app.use("/api/notifications", notificationRoutes);
@@ -87,6 +97,13 @@ app.use("/api/search", searchRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/cities", cityRoutes);
+
+// Admin Settings Routes
+app.use("/api/admin/settings", adminSettingsRoutes);
+// Admin Notifications Routes
+app.use("/api/admin/notifications", adminNotificationsRoutes);
+// Contact Routes
+app.use("/api/contact", contactRoutes);
 
 // 404 handler
 app.use(notFoundHandler);

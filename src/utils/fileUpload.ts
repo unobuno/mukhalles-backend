@@ -10,23 +10,30 @@ const ensureDirectoryExists = (dir: string) => {
   }
 };
 
-["avatars", "documents", "services", "covers", "licenses"].forEach((subdir) => {
+[
+  "avatars",
+  "documents",
+  "services",
+  "covers",
+  "licenses",
+  "categories",
+].forEach((subdir) => {
   ensureDirectoryExists(path.join(uploadDir, subdir));
 });
 
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const type = req.body.type || "documents";
+    const type = (req.query.type as string) || req.body.type || "documents";
     const dest = path.join(uploadDir, type);
     ensureDirectoryExists(dest);
     cb(null, dest);
   },
   filename: (_req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    );
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext);
+    const sanitized = basename.replace(/[^a-zA-Z0-9-_]/g, "-");
+    cb(null, sanitized + "-" + uniqueSuffix + ext);
   },
 });
 
@@ -45,7 +52,8 @@ const fileFilter = (
     file.fieldname === "image" ||
     req.body.type === "avatars" ||
     req.body.type === "services" ||
-    req.body.type === "covers"
+    req.body.type === "covers" ||
+    req.body.type === "categories"
   ) {
     if (allowedImageTypes.test(ext) && mimeType.startsWith("image/")) {
       cb(null, true);

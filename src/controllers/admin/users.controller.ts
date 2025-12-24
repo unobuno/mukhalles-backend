@@ -1,63 +1,11 @@
+/**
+ * Admin Users Controller
+ * Handles user management, roles, and status
+ */
 import { Request, Response } from "express";
-import { User, Office, Review, AdminLog, Analytics } from "../models";
-import { AuthRequest, VerificationStatus, AdminActionType, UserRole } from "../types";
-import logger from "../utils/logger";
-
-export const getDashboard = async (_req: AuthRequest, res: Response) => {
-  try {
-    const [
-      totalUsers,
-      totalCompanies,
-      totalOffices,
-      pendingVerifications,
-      totalReviews,
-      activeToday,
-    ] = await Promise.all([
-      User.countDocuments({ role: "individual" }),
-      User.countDocuments({ role: "company" }),
-      Office.countDocuments(),
-      User.countDocuments({ "companyProfile.verificationStatus": "pending" }),
-      Review.countDocuments(),
-      Analytics.countDocuments({
-        metric: "office_views",
-        timestamp: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-      }),
-    ]);
-
-    const topOffices = await Office.find()
-      .sort({ rating: -1, ratingCount: -1 })
-      .limit(10)
-      .lean();
-
-    const recentActivities = await AdminLog.find()
-      .populate("adminId", "phone individualProfile.fullName")
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .lean();
-
-    res.status(200).json({
-      success: true,
-      data: {
-        stats: {
-          totalUsers,
-          totalCompanies,
-          totalOffices,
-          pendingVerifications,
-          totalReviews,
-          activeToday,
-        },
-        recentActivities,
-        topOffices,
-      },
-    });
-  } catch (error) {
-    logger.error("Get dashboard error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to get dashboard data",
-    });
-  }
-};
+import { User, AdminLog, Business } from "../../models";
+import { AuthRequest, AdminActionType, UserRole } from "../../types";
+import logger from "../../utils/logger";
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
@@ -71,13 +19,11 @@ export const getUsers = async (req: Request, res: Response) => {
     if (role) query.role = role;
     if (status === "active") query.isActive = true;
     if (status === "inactive") query.isActive = false;
-    if (status === "pending")
-      query["companyProfile.verificationStatus"] = "pending";
+    if (status === "pending") query.role = "company";
     if (search) {
       query.$or = [
         { phone: { $regex: search, $options: "i" } },
         { "individualProfile.fullName": { $regex: search, $options: "i" } },
-        { "companyProfile.nameAr": { $regex: search, $options: "i" } },
       ];
     }
 
@@ -108,6 +54,101 @@ export const getUsers = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Failed to get users",
+    });
+  }
+};
+
+export const createUser = async (
+  req: AuthRequest,
+  res: Response
+): Promise<Response> => {
+  try {
+    const { phone, email, role, fullName, sendInvite = true } = req.body;
+
+    if (!phone || !email || !role || !fullName) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone, email, role, and fullName are required",
+      });
+    }
+
+    if (![UserRole.ADMIN, UserRole.MODERATOR].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Can only create admin or moderator users. Other users should register through the app.",
+      });
+    }
+
+    const existingUser = await User.findOne({
+      $or: [{ phone }, { email }],
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message:
+          existingUser.phone === phone
+            ? "رقم الهاتف مستخدم مسبقاً"
+            : "البريد الإلكتروني مستخدم مسبقاً",
+      });
+    }
+
+    const newUser = await User.create({
+      phone,
+      email,
+      role,
+      isActive: true,
+      isVerified: false,
+      individualProfile: {
+        fullName,
+        email,
+      },
+    });
+
+    await AdminLog.create({
+      adminId: req.user?.userId,
+      action: AdminActionType.CHANGE_USER_ROLE,
+      target: {
+        type: "user",
+        id: newUser._id,
+        name: fullName,
+      },
+      details: {
+        action: "create_user",
+        newValues: { phone, email, role, fullName },
+        sendInvite,
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+
+    if (sendInvite) {
+      logger.info(
+        `Invite email should be sent to ${email} for user ${fullName}`
+      );
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: sendInvite
+        ? "تم إنشاء المستخدم وإرسال دعوة بالبريد الإلكتروني"
+        : "تم إنشاء المستخدم بنجاح",
+      data: {
+        _id: newUser._id,
+        phone: newUser.phone,
+        email: newUser.email,
+        role: newUser.role,
+        individualProfile: newUser.individualProfile,
+        isActive: newUser.isActive,
+        createdAt: newUser.createdAt,
+      },
+    });
+  } catch (error) {
+    logger.error("Create user error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create user",
     });
   }
 };
@@ -191,45 +232,162 @@ export const updateUserStatus = async (
   }
 };
 
-export const verifyCompany = async (
+export const deleteUser = async (
   req: AuthRequest,
   res: Response
 ): Promise<Response> => {
   try {
     const { id } = req.params;
-    const { status, reason } = req.body;
+    const { reason, permanent = false } = req.body;
 
     const user = await User.findById(id);
 
-    if (!user || !user.companyProfile) {
+    if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Company not found",
+        message: "User not found",
       });
     }
 
-    user.companyProfile.verificationStatus = status as VerificationStatus;
-    user.companyProfile.approvedBy = req.user?.userId as any;
-    user.companyProfile.approvedAt = new Date();
-    await user.save();
-
-    if (status === "approved") {
-      await Office.updateMany(
-        { companyId: user._id },
-        { isActive: true, verified: true }
-      );
+    // Prevent deleting yourself
+    if (user.id === req.user?.userId) {
+      return res.status(403).json({
+        success: false,
+        message: "لا يمكنك حذف حسابك الخاص",
+      });
     }
+
+    // If user is a company owner, handle their business
+    let businessDeleted = false;
+    if (user.role === UserRole.COMPANY) {
+      const business = await Business.findOne({ ownerId: user._id });
+      if (business) {
+        if (permanent) {
+          await Business.deleteOne({ _id: business._id });
+          businessDeleted = true;
+        } else {
+          // Soft delete - just deactivate the business
+          business.isActive = false;
+          business.verificationStatus = "rejected" as any;
+          await business.save();
+        }
+      }
+    }
+
+    // Create audit log before deletion
+    await AdminLog.create({
+      adminId: req.user?.userId,
+      action: AdminActionType.SUSPEND_USER,
+      target: {
+        type: "user",
+        id: user._id,
+        name: user.individualProfile?.fullName || user.phone,
+      },
+      details: {
+        action: permanent ? "permanent_delete" : "soft_delete",
+        reason,
+        userData: {
+          phone: user.phone,
+          email: user.email,
+          role: user.role,
+        },
+        businessDeleted,
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+
+    if (permanent) {
+      // Permanent deletion - remove user from database
+      await User.deleteOne({ _id: user._id });
+
+      return res.status(200).json({
+        success: true,
+        message: "تم حذف المستخدم نهائياً",
+        data: { businessDeleted },
+      });
+    } else {
+      // Soft deletion - mark as inactive
+      user.isActive = false;
+      await user.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "تم تعليق حساب المستخدم",
+        data: { businessDeactivated: user.role === UserRole.COMPANY },
+      });
+    }
+  } catch (error) {
+    logger.error("Delete user error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "فشل حذف المستخدم",
+    });
+  }
+};
+
+export const updateUser = async (
+  req: AuthRequest,
+  res: Response
+): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const oldValues = {
+      role: user.role,
+      isActive: user.isActive,
+      phone: user.phone,
+      email: user.email,
+      individualProfile: user.individualProfile
+        ? { ...user.individualProfile }
+        : undefined,
+    };
+
+    const allowedFields = [
+      "role",
+      "isActive",
+      "phone",
+      "email",
+      "individualProfile.fullName",
+      "individualProfile.nationalId",
+      "individualProfile.nationality",
+      "individualProfile.dateOfBirth",
+    ];
+
+    allowedFields.forEach((field) => {
+      if (updateData[field] !== undefined) {
+        if (field.includes(".")) {
+          const [parent, child] = field.split(".");
+          if (!(user as any)[parent]) (user as any)[parent] = {};
+          (user as any)[parent][child] = updateData[field];
+        } else {
+          (user as any)[field] = updateData[field];
+        }
+      }
+    });
+
+    await user.save();
 
     await AdminLog.create({
       adminId: req.user?.userId,
-      action: AdminActionType.APPROVE_COMPANY,
+      action: AdminActionType.UPDATE_USER,
       target: {
-        type: "company",
+        type: "user",
         id: user._id,
       },
       details: {
-        newValues: { verificationStatus: status },
-        reason,
+        oldValues,
+        newValues: updateData,
       },
       ipAddress: req.ip,
       userAgent: req.get("user-agent"),
@@ -237,203 +395,18 @@ export const verifyCompany = async (
 
     return res.status(200).json({
       success: true,
-      message: "Company verification status updated successfully",
+      message: "User updated successfully",
+      data: user,
     });
   } catch (error) {
-    logger.error("Verify company error:", error);
+    logger.error("Update user error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to verify company",
+      message: "Failed to update user",
     });
   }
 };
 
-export const featureOffice = async (
-  req: AuthRequest,
-  res: Response
-): Promise<Response> => {
-  try {
-    const { id } = req.params;
-    const { isFeatured, priority } = req.body;
-
-    const office = await Office.findById(id);
-
-    if (!office) {
-      return res.status(404).json({
-        success: false,
-        message: "Office not found",
-      });
-    }
-
-    office.isFeatured = isFeatured;
-    if (priority !== undefined) office.featuredPriority = priority;
-    await office.save();
-
-    await AdminLog.create({
-      adminId: req.user?.userId,
-      action: AdminActionType.FEATURE_OFFICE,
-      target: {
-        type: "office",
-        id: office._id,
-      },
-      details: {
-        newValues: { isFeatured, priority },
-      },
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent"),
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Office featured status updated successfully",
-    });
-  } catch (error) {
-    logger.error("Feature office error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to feature office",
-    });
-  }
-};
-
-export const getReviewsForModeration = async (req: Request, res: Response) => {
-  try {
-    const { page = 1, limit = 20, isApproved } = req.query;
-
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const skip = (pageNum - 1) * limitNum;
-
-    const query: any = {};
-    if (isApproved !== undefined) query.isApproved = isApproved === "true";
-
-    const [reviews, total] = await Promise.all([
-      Review.find(query)
-        .populate("userId", "individualProfile.fullName phone")
-        .populate("officeId", "name city")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limitNum)
-        .lean(),
-      Review.countDocuments(query),
-    ]);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        reviews,
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total,
-          totalPages: Math.ceil(total / limitNum),
-        },
-      },
-    });
-  } catch (error) {
-    logger.error("Get reviews for moderation error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to get reviews",
-    });
-  }
-};
-
-export const approveReview = async (
-  req: AuthRequest,
-  res: Response
-): Promise<Response> => {
-  try {
-    const { id } = req.params;
-    const { isApproved } = req.body;
-
-    const review = await Review.findById(id);
-
-    if (!review) {
-      return res.status(404).json({
-        success: false,
-        message: "Review not found",
-      });
-    }
-
-    review.isApproved = isApproved;
-    review.moderatedBy = req.user?.userId as any;
-    review.moderatedAt = new Date();
-    await review.save();
-
-    await AdminLog.create({
-      adminId: req.user?.userId,
-      action: AdminActionType.MODERATE_REVIEW,
-      target: {
-        type: "review",
-        id: review._id,
-      },
-      details: {
-        newValues: { isApproved },
-      },
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent"),
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Review moderation status updated successfully",
-    });
-  } catch (error) {
-    logger.error("Approve review error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to approve review",
-    });
-  }
-};
-
-export const deleteReview = async (
-  req: AuthRequest,
-  res: Response
-): Promise<Response> => {
-  try {
-    const { id } = req.params;
-
-    const review = await Review.findById(id);
-
-    if (!review) {
-      return res.status(404).json({
-        success: false,
-        message: "Review not found",
-      });
-    }
-
-    await Review.findByIdAndDelete(id);
-
-    await AdminLog.create({
-      adminId: req.user?.userId,
-      action: AdminActionType.MODERATE_REVIEW,
-      target: {
-        type: "review",
-        id: review._id,
-      },
-      details: {
-        reason: "Review deleted by admin",
-      },
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent"),
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Review deleted successfully",
-    });
-  } catch (error) {
-    logger.error("Delete review error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to delete review",
-    });
-  }
-};
-
-// Roles
 export const updateUserRole = async (
   req: AuthRequest,
   res: Response
@@ -476,7 +449,7 @@ export const updateUserRole = async (
       target: {
         type: "user",
         id: user._id,
-        name: user.individualProfile?.fullName || user.companyProfile?.nameAr || user.phone,
+        name: user.individualProfile?.fullName || user.phone,
       },
       details: {
         oldValues: { role: oldRole },
@@ -527,7 +500,7 @@ export const bulkUpdateRoles = async (
       });
     }
 
-    const filteredUserIds = userIds.filter(id => id !== req.user?.userId);
+    const filteredUserIds = userIds.filter((id) => id !== req.user?.userId);
     if (filteredUserIds.length !== userIds.length) {
       return res.status(403).json({
         success: false,
@@ -552,7 +525,7 @@ export const bulkUpdateRoles = async (
         userId: user._id,
         oldRole,
         newRole: role,
-        name: user.individualProfile?.fullName || user.companyProfile?.nameAr || user.phone,
+        name: user.individualProfile?.fullName || user.phone,
       };
     });
 
@@ -592,7 +565,10 @@ export const bulkUpdateRoles = async (
   }
 };
 
-export const getRoleHistory = async (req: Request, res: Response): Promise<Response> => {
+export const getRoleHistory = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
   try {
     const { page = 1, limit = 20, userId, actionType } = req.query;
 
@@ -602,7 +578,9 @@ export const getRoleHistory = async (req: Request, res: Response): Promise<Respo
 
     const query: any = {};
 
-    query.action = { $in: [AdminActionType.CHANGE_USER_ROLE, AdminActionType.BULK_ROLE_UPDATE] };
+    query.action = {
+      $in: [AdminActionType.CHANGE_USER_ROLE, AdminActionType.BULK_ROLE_UPDATE],
+    };
 
     if (userId) query["target.id"] = userId;
     if (actionType) query.action = actionType;
@@ -638,7 +616,10 @@ export const getRoleHistory = async (req: Request, res: Response): Promise<Respo
   }
 };
 
-export const getRoleStatistics = async (_req: Request, res: Response): Promise<Response> => {
+export const getRoleStatistics = async (
+  _req: Request,
+  res: Response
+): Promise<Response> => {
   try {
     const roleStats = await User.aggregate([
       {
@@ -646,13 +627,13 @@ export const getRoleStatistics = async (_req: Request, res: Response): Promise<R
           _id: "$role",
           count: { $sum: 1 },
           active: {
-            $sum: { $cond: [{ $eq: ["$isActive", true] }, 1, 0] }
+            $sum: { $cond: [{ $eq: ["$isActive", true] }, 1, 0] },
           },
         },
       },
       {
-        $sort: { count: -1 }
-      }
+        $sort: { count: -1 },
+      },
     ]);
 
     const totalUsers = await User.countDocuments();

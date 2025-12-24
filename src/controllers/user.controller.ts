@@ -28,7 +28,6 @@ export const getProfile = async (
         isVerified: user.isVerified,
         isActive: user.isActive,
         individualProfile: user.individualProfile,
-        companyProfile: user.companyProfile,
         notificationPreferences: user.notificationPreferences,
       },
     });
@@ -235,6 +234,38 @@ export const updateNotificationPreferences = async (
     return res.status(500).json({
       success: false,
       message: "Failed to update notification preferences",
+    });
+  }
+};
+
+export const updatePushToken = async (
+  req: AuthRequest,
+  res: Response
+): Promise<Response> => {
+  try {
+    const { pushToken } = req.body;
+
+    const user = await User.findById(req.user?.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    user.pushToken = pushToken;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Push token updated successfully",
+    });
+  } catch (error) {
+    logger.error("Update push token error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update push token",
     });
   }
 };

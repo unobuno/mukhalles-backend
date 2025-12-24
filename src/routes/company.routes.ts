@@ -5,12 +5,8 @@ import {
   getCompanyProfile,
   updateCompanyProfile,
   uploadCompanyDocument,
-  getCompanyServices,
-  createService,
-  updateService,
-  deleteService,
-  getDelegate,
-  updateDelegate,
+  deleteCompanyDocument,
+  getBusinessForUser,
 } from "../controllers/company.controller";
 import { upload } from "../utils/fileUpload";
 
@@ -25,11 +21,7 @@ router.post(
   upload.single("file"),
   uploadCompanyDocument
 );
-router.get("/services", authenticate, getCompanyServices);
-router.post("/services", authenticate, createService);
-router.put("/services/:id", authenticate, updateService);
-router.delete("/services/:id", authenticate, deleteService);
-router.get("/delegates", authenticate, getDelegate);
-router.post("/delegates", authenticate, updateDelegate);
+router.delete("/documents/:documentId", authenticate, deleteCompanyDocument);
+router.get("/business", authenticate, getBusinessForUser);
 
 export default router;

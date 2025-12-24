@@ -14,7 +14,8 @@ router.post("/image", authenticate, upload.single("file"), (req, res) => {
     });
   }
 
-  const type = req.body.type || "documents";
+  // Use query param for type - same as what multer uses for destination
+  const type = (req.query.type as string) || req.body.type || "documents";
   const fileUrl = `/uploads/${type}/${req.file.filename}`;
 
   return res.status(200).json({

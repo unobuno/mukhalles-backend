@@ -6,6 +6,7 @@ import {
   uploadProfilePicture,
   getNotificationPreferences,
   updateNotificationPreferences,
+  updatePushToken,
 } from "../controllers/user.controller";
 import { upload } from "../utils/fileUpload";
 
@@ -29,5 +30,6 @@ router.put(
   authenticate,
   updateNotificationPreferences
 );
+router.put("/push-token", authenticate, updatePushToken);
 
 export default router;

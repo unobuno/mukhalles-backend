@@ -6,6 +6,7 @@ import {
   updateCategory,
   deleteCategory,
   getAllCategoriesAdmin,
+  reorderCategories,
 } from "../controllers/category.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
 import { UserRole } from "../types";
@@ -14,7 +15,14 @@ const router: IRouter = Router();
 
 // Public routes
 router.get("/", getAllCategories);
-router.get("/:id", getCategoryById);
+
+// Admin endpoint to get all categories (including inactive)
+router.get(
+  "/admin/all",
+  authenticate,
+  authorize(UserRole.ADMIN, UserRole.MODERATOR),
+  getAllCategoriesAdmin
+);
 
 // Admin only routes
 router.post(
@@ -23,6 +31,15 @@ router.post(
   authorize(UserRole.ADMIN, UserRole.MODERATOR),
   createCategory
 );
+
+// Reorder categories
+router.put(
+  "/admin/reorder",
+  authenticate,
+  authorize(UserRole.ADMIN, UserRole.MODERATOR),
+  reorderCategories
+);
+
 router.put(
   "/:id",
   authenticate,
@@ -36,12 +53,6 @@ router.delete(
   deleteCategory
 );
 
-// Admin endpoint to get all categories (including inactive)
-router.get(
-  "/admin/all",
-  authenticate,
-  authorize(UserRole.ADMIN, UserRole.MODERATOR),
-  getAllCategoriesAdmin
-);
+router.get("/:id", getCategoryById);
 
 export default router;

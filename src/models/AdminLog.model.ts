@@ -27,7 +27,7 @@ const TargetSchema = new Schema<ITarget>(
     type: {
       type: String,
       required: true,
-      enum: ["user", "company", "office", "review", "document"],
+      enum: ["user", "business", "review", "document", "category"],
     },
     id: { type: Schema.Types.ObjectId, required: true },
   },

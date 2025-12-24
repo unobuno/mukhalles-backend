@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { User } from "../models";
+import { User, Business } from "../models";
 import {
   createOTPSession,
   verifyOTP,
@@ -78,6 +78,37 @@ export const verifyOTPController = async (
       });
     }
 
+    let isProfileComplete = false;
+    let verificationStatus = null;
+    let hasBusiness = false;
+    let businessData = null;
+
+    if (user.role === UserRole.INDIVIDUAL) {
+      isProfileComplete = !!user.individualProfile?.fullName;
+    } else {
+      // Check if user has a Business entity
+      const business = await Business.findOne({ ownerId: user._id });
+      hasBusiness = !!business;
+      isProfileComplete = hasBusiness;
+      verificationStatus = business?.verificationStatus || null;
+
+      // Include basic business data for company users
+      if (business) {
+        businessData = {
+          id: business._id,
+          nameAr: business.name,
+          nameEn: business.nameEn,
+          logoUrl: business.avatarUrl,
+          city: business.city,
+          verificationStatus: business.verificationStatus,
+        };
+      }
+    }
+
+    logger.info(
+      `User ${user.phone} login: role=${user.role}, isProfileComplete=${isProfileComplete}, hasBusiness=${hasBusiness}, verificationStatus=${verificationStatus}`
+    );
+
     const tokens = generateTokens({
       userId: user.id,
       phone: user.phone,
@@ -85,18 +116,18 @@ export const verifyOTPController = async (
       permissions: [],
     });
 
-    const isProfileComplete =
-      user.role === UserRole.INDIVIDUAL
-        ? !!user.individualProfile?.fullName
-        : !!user.companyProfile?.nameAr;
-
     res.status(200).json({
       success: true,
       user: {
         id: user._id,
         phone: user.phone,
+        email: user.email,
         role: user.role,
         isProfileComplete,
+        verificationStatus,
+        hasBusiness,
+        individualProfile: user.individualProfile,
+        business: businessData,
       },
       tokens,
     });

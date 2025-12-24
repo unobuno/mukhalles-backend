@@ -6,7 +6,7 @@ interface ILike {
 }
 
 export interface IReview extends Document {
-  officeId: mongoose.Types.ObjectId;
+  businessId: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
   rating: number;
   text: string;
@@ -31,9 +31,9 @@ const LikeSchema = new Schema<ILike>({
 
 const ReviewSchema = new Schema<IReview>(
   {
-    officeId: {
+    businessId: {
       type: Schema.Types.ObjectId,
-      ref: "Office",
+      ref: "Business",
       required: true,
       index: true,
     },
@@ -63,12 +63,12 @@ const ReviewSchema = new Schema<IReview>(
 );
 
 // Indexes
-ReviewSchema.index({ officeId: 1, isApproved: 1, createdAt: -1 });
-ReviewSchema.index({ officeId: 1, rating: -1 });
+ReviewSchema.index({ businessId: 1, isApproved: 1, createdAt: -1 });
+ReviewSchema.index({ businessId: 1, rating: -1 });
 ReviewSchema.index({ "likes.userId": 1 });
 ReviewSchema.index({ isApproved: 1 });
 
-// Compound index for user review uniqueness per office
-ReviewSchema.index({ userId: 1, officeId: 1 });
+// Compound index for user review uniqueness per business
+ReviewSchema.index({ userId: 1, businessId: 1 });
 
 export default mongoose.model<IReview>("Review", ReviewSchema);

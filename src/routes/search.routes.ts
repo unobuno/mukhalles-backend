@@ -1,11 +1,11 @@
 import { Router, type Router as IRouter } from "express";
-import { Office } from "../models";
+import { Business } from "../models";
 import { searchLimiter } from "../middleware/rateLimiter";
 
 const router: IRouter = Router();
 router.use(searchLimiter);
 
-router.get("/offices", async (req, res) => {
+router.get("/businesses", async (req, res) => {
   try {
     const {
       q,
@@ -31,20 +31,20 @@ router.get("/offices", async (req, res) => {
     if (verified === "true") query.verified = true;
     if (featured === "true") query.isFeatured = true;
 
-    const [offices, total] = await Promise.all([
-      Office.find(query)
+    const [businesses, total] = await Promise.all([
+      Business.find(query)
         .select("-services -__v")
         .sort({ score: { $meta: "textScore" }, rating: -1 })
         .skip(skip)
         .limit(limitNum)
         .lean(),
-      Office.countDocuments(query),
+      Business.countDocuments(query),
     ]);
 
     res.status(200).json({
       success: true,
       data: {
-        offices,
+        businesses,
         pagination: {
           page: pageNum,
           limit: limitNum,
@@ -56,7 +56,7 @@ router.get("/offices", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Failed to search offices",
+      message: "Failed to search businesses",
     });
   }
 });
@@ -72,7 +72,7 @@ router.get("/suggestions", async (req, res) => {
       });
     }
 
-    const suggestions = await Office.find({
+    const suggestions = await Business.find({
       isActive: true,
       $or: [
         { name: { $regex: q as string, $options: "i" } },

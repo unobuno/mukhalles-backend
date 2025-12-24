@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 interface IDimensions {
-  officeId?: mongoose.Types.ObjectId;
+  businessId?: mongoose.Types.ObjectId;
   city?: string;
   category?: string;
   userId?: mongoose.Types.ObjectId;
@@ -17,7 +17,7 @@ export interface IAnalytics extends Document {
 
 const DimensionsSchema = new Schema<IDimensions>(
   {
-    officeId: { type: Schema.Types.ObjectId, ref: "Office" },
+    businessId: { type: Schema.Types.ObjectId, ref: "Business" },
     city: { type: String },
     category: { type: String },
     userId: { type: Schema.Types.ObjectId, ref: "User" },
@@ -31,7 +31,7 @@ const AnalyticsSchema = new Schema<IAnalytics>(
       type: String,
       required: true,
       enum: [
-        "office_views",
+        "business_views",
         "contact_clicks",
         "user_registrations",
         "bookmarks",
@@ -62,7 +62,7 @@ const AnalyticsSchema = new Schema<IAnalytics>(
 
 // Indexes for time-series queries
 AnalyticsSchema.index({ metric: 1, timestamp: -1 });
-AnalyticsSchema.index({ "dimensions.officeId": 1, timestamp: -1 });
+AnalyticsSchema.index({ "dimensions.businessId": 1, timestamp: -1 });
 AnalyticsSchema.index({ "dimensions.city": 1, metric: 1, timestamp: -1 });
 
 export default mongoose.model<IAnalytics>("Analytics", AnalyticsSchema);

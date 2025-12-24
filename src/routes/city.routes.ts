@@ -12,8 +12,18 @@ import { UserRole } from "../types";
 
 const router: IRouter = Router();
 
-// Public routes
+// Public route - get all active cities
 router.get("/", getAllCities);
+
+// Admin endpoint to get all cities (including inactive) - must come before /:id
+router.get(
+  "/admin/all",
+  authenticate,
+  authorize(UserRole.ADMIN, UserRole.MODERATOR),
+  getAllCitiesAdmin
+);
+
+// Public route - get city by ID
 router.get("/:id", getCityById);
 
 // Admin only routes
@@ -34,14 +44,6 @@ router.delete(
   authenticate,
   authorize(UserRole.ADMIN, UserRole.MODERATOR),
   deleteCity
-);
-
-// Admin endpoint to get all cities (including inactive)
-router.get(
-  "/admin/all",
-  authenticate,
-  authorize(UserRole.ADMIN, UserRole.MODERATOR),
-  getAllCitiesAdmin
 );
 
 export default router;

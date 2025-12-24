@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { Bookmark, Office } from "../models";
+import { Bookmark, Business } from "../models";
 import { AuthRequest } from "../types";
 import logger from "../utils/logger";
 
@@ -12,7 +12,7 @@ export const getUserBookmarks = async (req: AuthRequest, res: Response) => {
     const skip = (pageNum - 1) * limitNum;
 
     const bookmarks = await Bookmark.find({ userId: req.user?.userId })
-      .populate("officeId")
+      .populate("businessId")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
@@ -22,10 +22,10 @@ export const getUserBookmarks = async (req: AuthRequest, res: Response) => {
 
     if (city || category) {
       filteredBookmarks = bookmarks.filter((bookmark: any) => {
-        const office = bookmark.officeId;
-        if (!office) return false;
-        if (city && office.city !== city) return false;
-        if (category && office.category !== category) return false;
+        const business = bookmark.businessId;
+        if (!business) return false;
+        if (city && business.city !== city) return false;
+        if (category && business.category !== category) return false;
         return true;
       });
     }
@@ -60,37 +60,37 @@ export const addBookmark = async (
   try {
     const { id } = req.params;
 
-    const office = await Office.findById(id);
+    const business = await Business.findById(id);
 
-    if (!office) {
+    if (!business) {
       return res.status(404).json({
         success: false,
-        message: "Office not found",
+        message: "Business not found",
       });
     }
 
     const existingBookmark = await Bookmark.findOne({
       userId: req.user?.userId,
-      officeId: id,
+      businessId: id,
     });
 
     if (existingBookmark) {
       return res.status(400).json({
         success: false,
-        message: "Office already bookmarked",
+        message: "Business already bookmarked",
       });
     }
 
     await Bookmark.create({
       userId: req.user?.userId,
-      officeId: id,
+      businessId: id,
     });
 
-    await Office.findByIdAndUpdate(id, { $inc: { "stats.bookmarks": 1 } });
+    await Business.findByIdAndUpdate(id, { $inc: { "stats.bookmarks": 1 } });
 
     return res.status(201).json({
       success: true,
-      message: "Office bookmarked successfully",
+      message: "Business bookmarked successfully",
       isBookmarked: true,
     });
   } catch (error) {
@@ -111,7 +111,7 @@ export const removeBookmark = async (
 
     const bookmark = await Bookmark.findOne({
       userId: req.user?.userId,
-      officeId: id,
+      businessId: id,
     });
 
     if (!bookmark) {
@@ -122,7 +122,7 @@ export const removeBookmark = async (
     }
 
     await Bookmark.findByIdAndDelete(bookmark._id);
-    await Office.findByIdAndUpdate(id, { $inc: { "stats.bookmarks": -1 } });
+    await Business.findByIdAndUpdate(id, { $inc: { "stats.bookmarks": -1 } });
 
     return res.status(200).json({
       success: true,

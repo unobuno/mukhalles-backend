@@ -17,8 +17,13 @@ interface IData {
   [key: string]: any;
 }
 
+// Target audience types for broadcast notifications
+type TargetAudience = "individual" | "all" | "roles";
+
 export interface INotification extends Document {
-  userId: mongoose.Types.ObjectId;
+  userId?: mongoose.Types.ObjectId; // Optional for broadcasts
+  targetAudience: TargetAudience;
+  targetRoles?: string[]; // For role-based broadcasts
   type: NotificationType;
   title: ITitle;
   message: IMessage;
@@ -49,9 +54,16 @@ const NotificationSchema = new Schema<INotification>(
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
       index: true,
+      // Not required for broadcasts
     },
+    targetAudience: {
+      type: String,
+      enum: ["individual", "all", "roles"],
+      default: "individual",
+      required: true,
+    },
+    targetRoles: [{ type: String }],
     type: {
       type: String,
       enum: Object.values(NotificationType),
@@ -70,6 +82,8 @@ const NotificationSchema = new Schema<INotification>(
 
 // Indexes
 NotificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
+NotificationSchema.index({ targetAudience: 1, createdAt: -1 });
+NotificationSchema.index({ targetAudience: 1, targetRoles: 1 });
 NotificationSchema.index({ type: 1 });
 
 // TTL index - automatically delete notifications after 30 days

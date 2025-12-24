@@ -1,6 +1,7 @@
 import { Response, NextFunction } from "express";
 import { AuthRequest, UserRole } from "../types";
 import { verifyAccessToken } from "../utils/jwt";
+import { User } from "../models";
 
 export const authenticate = async (
   req: AuthRequest,
@@ -19,6 +20,28 @@ export const authenticate = async (
     }
 
     const decoded = verifyAccessToken(token);
+
+    // Check if user still exists and is active
+    const user = await User.findById(decoded.userId).select("isActive").lean();
+
+    if (!user) {
+      res.status(401).json({
+        success: false,
+        message: "User account has been deleted",
+        code: "USER_DELETED",
+      });
+      return;
+    }
+
+    if (!user.isActive) {
+      res.status(403).json({
+        success: false,
+        message: "Your account has been suspended",
+        code: "USER_SUSPENDED",
+      });
+      return;
+    }
+
     req.user = decoded;
     next();
   } catch (error) {
@@ -49,4 +72,30 @@ export const authorize = (...roles: UserRole[]) => {
 
     next();
   };
+};
+
+export const optionalAuthenticate = async (
+  req: AuthRequest,
+  _: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+
+    if (!token) {
+      return next();
+    }
+
+    const decoded = verifyAccessToken(token);
+    const user = await User.findById(decoded.userId).select("isActive").lean();
+
+    if (user && user.isActive) {
+      req.user = decoded;
+    }
+
+    next();
+  } catch (error) {
+    // Treat as unauthenticated if token is invalid
+    next();
+  }
 };
