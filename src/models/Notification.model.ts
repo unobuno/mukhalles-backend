@@ -30,6 +30,7 @@ export interface INotification extends Document {
   data?: IData;
   isRead: boolean;
   readAt?: Date;
+  readBy?: mongoose.Types.ObjectId[]; // Array of user IDs who have read this notification
   createdAt: Date;
 }
 
@@ -74,6 +75,7 @@ const NotificationSchema = new Schema<INotification>(
     data: { type: Schema.Types.Mixed },
     isRead: { type: Boolean, default: false },
     readAt: { type: Date },
+    readBy: [{ type: Schema.Types.ObjectId, ref: "User" }],
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

@@ -63,7 +63,7 @@ export const createCity = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { id, name } = req.body;
+    const { id, title } = req.body;
 
     // Check if city with this ID already exists
     const existingCity = await City.findOne({ id });
@@ -77,7 +77,7 @@ export const createCity = async (
 
     const city = new City({
       id,
-      name,
+      title,
     });
 
     await city.save();
@@ -105,7 +105,7 @@ export const updateCity = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, isActive } = req.body;
+    const { title, isActive } = req.body;
 
     const city = await City.findOne({ id });
     if (!city) {
@@ -116,8 +116,8 @@ export const updateCity = async (
       return;
     }
 
-    if (name) {
-      city.name = name;
+    if (title) {
+      city.title = title;
     }
 
     if (typeof isActive === "boolean") {

@@ -515,14 +515,17 @@ export const getBusinesses = async (req: any, res: any) => {
     if (category) query.category = category;
     if (featured === "true") query.isFeatured = true;
     if (search) {
-      // Use regex for partial matching (better for Arabic with prefixes like ال)
-      const searchRegex = new RegExp(search as string, "i");
-      query.$or = [
-        { name: searchRegex },
-        { nameEn: searchRegex },
-        { description: searchRegex },
-        { city: searchRegex },
-      ];
+      const trimmedSearch = (search as string).trim();
+      if (trimmedSearch) {
+        // Use regex for partial matching (better for Arabic with prefixes like ال)
+        const searchRegex = new RegExp(trimmedSearch, "i");
+        query.$or = [
+          { name: searchRegex },
+          { nameEn: searchRegex },
+          { description: searchRegex },
+          { city: searchRegex },
+        ];
+      }
     }
 
     const sortOptions: any = {};
@@ -733,6 +736,76 @@ export const trackBusinessContactClick = async (
     return res.status(500).json({
       success: false,
       message: "Failed to track contact click",
+    });
+  }
+};
+
+export const trackSocialMediaClick = async (
+  req: AuthRequest,
+  res: Response
+): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const { platform } = req.body;
+
+    // Validate platform
+    const validPlatforms = [
+      "facebook",
+      "x",
+      "linkedin",
+      "snapchat",
+      "instagram",
+      "tiktok",
+      "youtube",
+      "telegram",
+    ];
+
+    if (!platform || !validPlatforms.includes(platform)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid social media platform",
+      });
+    }
+
+    const business = await Business.findById(id);
+
+    if (!business) {
+      return res.status(404).json({
+        success: false,
+        message: "Business not found",
+      });
+    }
+
+    // Increment contact clicks (social media is a contact method)
+    await Business.findByIdAndUpdate(id, {
+      $inc: { "stats.contactClicks": 1 },
+    });
+
+    // Track in analytics
+    await Analytics.create({
+      metric: "contact_clicks",
+      value: 1,
+      dimensions: {
+        businessId: business._id,
+        city: business.city,
+        category: business.category,
+        userId: req.user?.userId,
+      },
+      timestamp: new Date(),
+      granularity: "hour",
+    });
+
+    logger.info(`Social media click tracked: ${platform} for business ${id}`);
+
+    return res.status(200).json({
+      success: true,
+      message: "Social media click tracked",
+    });
+  } catch (error) {
+    logger.error("Track social media click error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to track social media click",
     });
   }
 };

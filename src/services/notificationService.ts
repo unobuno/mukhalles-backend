@@ -87,6 +87,7 @@ function shouldDeliverNotification(
     case NotificationType.SERVICE_UPDATE:
     case NotificationType.REVIEW:
     case NotificationType.OFFICE_UPDATE:
+    case NotificationType.NEW_BUSINESS:
       // Check offices preference
       if (preferences.offices === "none") return false;
       break;
@@ -94,14 +95,13 @@ function shouldDeliverNotification(
     case NotificationType.SYSTEM:
     case NotificationType.ANNOUNCEMENT:
     case NotificationType.MAINTENANCE:
-      // Check updates preference
-      if (preferences.updates === "none") return false;
-      break;
-
+    case NotificationType.INFO:
+    case NotificationType.VERIFICATION_STATUS:
     case NotificationType.MILESTONE:
     case NotificationType.BOOKING:
-      // Check categories preference
-      if (preferences.categories === "none") return false;
+    case NotificationType.LOW_RATING:
+      // These notifications are always sent if push is enabled
+      // (since we removed updates and categories preferences)
       break;
   }
 

@@ -2,10 +2,7 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface ICity extends Document {
   id: string;
-  name: {
-    ar: string;
-    en?: string;
-  };
+  title: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -20,16 +17,10 @@ const CitySchema = new Schema<ICity>(
       trim: true,
       lowercase: true,
     },
-    name: {
-      ar: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-      en: {
-        type: String,
-        trim: true,
-      },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
     },
     isActive: {
       type: Boolean,

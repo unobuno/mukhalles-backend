@@ -8,6 +8,7 @@ import {
   getFeaturedBusinesses,
   getBusinessById,
   trackBusinessContactClick,
+  trackSocialMediaClick,
   updateBusiness,
 } from "../controllers/company.controller";
 import {
@@ -26,6 +27,7 @@ router.get("/featured", optionalAuthenticate, getFeaturedBusinesses);
 router.get("/:id", optionalAuthenticate, getBusinessById);
 router.put("/:id", authenticate, updateBusiness);
 router.post("/:id/contact-click", authenticate, trackBusinessContactClick);
+router.post("/:id/social-media-click", authenticate, trackSocialMediaClick);
 router.get("/:id/reviews", getBusinessReviews);
 router.post("/:id/reviews", authenticate, createReview);
 router.post("/:id/bookmark", authenticate, addBookmark);

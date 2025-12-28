@@ -41,6 +41,7 @@ export enum NotificationType {
   BOOKING = "booking",
   VERIFICATION_STATUS = "verification_status",
   NEW_BUSINESS = "new_business", // Admin: new business registered
+  NEW_USER = "new_user", // Admin: new individual user registered
   LOW_RATING = "low_rating", // Admin: low rating for moderation
   SERVICE_UPDATE = "service_update", // User: bookmarked office updated
   MILESTONE = "milestone", // Business: profile view milestones

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AuthRequest, NotificationType } from "../types";
 import { User, Notification } from "../models";
 import logger from "../utils/logger";
+import * as notificationService from "../services/notificationService";
 
 // Create notification for specific user or broadcast to all/roles
 export const createNotification = async (
@@ -44,41 +45,36 @@ export const createNotification = async (
       en: message.en || message.ar,
     };
 
-    let result;
     let targetCount = 0;
     let targetDescription = "";
 
+    const notificationPayload = {
+      type,
+      title: notificationTitle,
+      message: notificationMessage,
+      data,
+    };
+
     if (targetUsers === "all") {
-      // BROADCAST: Create ONE notification for all users
-      result = await Notification.create({
-        targetAudience: "all",
-        type,
-        title: notificationTitle,
-        message: notificationMessage,
-        data,
-        isRead: false,
-      });
+      // BROADCAST to ALL users (with push notifications)
+      const success = await notificationService.sendToAll(notificationPayload);
 
       // Get count for response message
       targetCount = await User.countDocuments({ isActive: true });
       targetDescription = "جميع المستخدمين";
 
-      logger.info("Broadcast notification created (all users):", {
+      logger.info("Broadcast notification sent to all users:", {
         adminId: req.user?.userId,
-        notificationId: result._id,
         type,
+        success,
+        targetCount,
       });
     } else if (targetUsers === "role" && roles.length > 0) {
-      // BROADCAST: Create ONE notification for specific roles
-      result = await Notification.create({
-        targetAudience: "roles",
-        targetRoles: roles,
-        type,
-        title: notificationTitle,
-        message: notificationMessage,
-        data,
-        isRead: false,
-      });
+      // BROADCAST to specific ROLES (with push notifications)
+      const success = await notificationService.sendToRole(
+        roles,
+        notificationPayload
+      );
 
       // Get count for response message
       targetCount = await User.countDocuments({
@@ -87,32 +83,33 @@ export const createNotification = async (
       });
       targetDescription = `الأدوار: ${roles.join("، ")}`;
 
-      logger.info("Broadcast notification created (roles):", {
+      logger.info("Broadcast notification sent to roles:", {
         adminId: req.user?.userId,
-        notificationId: result._id,
         type,
         roles,
+        success,
+        targetCount,
       });
     } else if (targetUsers === "individuals" && userIds.length > 0) {
-      // INDIVIDUAL: Create separate notification for each user
-      const notifications = userIds.map((userId: string) => ({
-        userId,
-        targetAudience: "individual",
-        type,
-        title: notificationTitle,
-        message: notificationMessage,
-        data,
-        isRead: false,
-      }));
+      // INDIVIDUAL: Send to each user (with push notifications)
+      let successCount = 0;
 
-      result = await Notification.insertMany(notifications);
+      for (const userId of userIds) {
+        const success = await notificationService.sendToUser(
+          userId,
+          notificationPayload
+        );
+        if (success) successCount++;
+      }
+
       targetCount = userIds.length;
-      targetDescription = `${targetCount} مستخدم محدد`;
+      targetDescription = `${targetCount} مستخدم محدد (${successCount} نجح)`;
 
-      logger.info("Individual notifications created:", {
+      logger.info("Individual notifications sent:", {
         adminId: req.user?.userId,
         type,
-        count: targetCount,
+        total: targetCount,
+        successful: successCount,
       });
     } else {
       return res.status(400).json({

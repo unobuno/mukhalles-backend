@@ -45,7 +45,8 @@ export const updateProfile = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { fullName, email, city, notificationChannel } = req.body;
+    const { fullName, email, city, notificationChannel, address, birthDate } =
+      req.body;
 
     const user = await User.findById(req.user?.userId);
 
@@ -57,6 +58,9 @@ export const updateProfile = async (
       return;
     }
 
+    // Track if this is the first time completing profile
+    const isFirstTimeCompletion = !user.individualProfile?.fullName;
+
     if (!user.individualProfile) {
       user.individualProfile = {
         fullName: "",
@@ -66,14 +70,53 @@ export const updateProfile = async (
 
     if (fullName !== undefined) user.individualProfile.fullName = fullName;
     if (email !== undefined) {
-      user.individualProfile.email = email;
-      user.email = email;
+      // Convert empty string to null to avoid duplicate key error with sparse index
+      const emailValue = email.trim() === "" ? null : email;
+      user.individualProfile.email = emailValue;
+      user.email = emailValue;
     }
     if (city !== undefined) user.individualProfile.city = city;
+    if (address !== undefined) user.individualProfile.address = address;
+    if (birthDate !== undefined) user.individualProfile.birthDate = birthDate;
     if (notificationChannel !== undefined)
       user.individualProfile.notificationChannel = notificationChannel;
 
     await user.save();
+
+    // Notify admins of new individual user registration (first time only)
+    if (isFirstTimeCompletion && fullName && user.role === "individual") {
+      try {
+        const { Notification } = await import("../models");
+        const { NotificationType, UserRole } = await import("../types");
+
+        await Notification.create({
+          targetAudience: "roles",
+          targetRoles: [UserRole.ADMIN, UserRole.MODERATOR],
+          type: NotificationType.NEW_USER,
+          title: {
+            ar: "مستخدم جديد مسجل",
+            en: "New User Registered",
+          },
+          message: {
+            ar: `تم تسجيل مستخدم فردي جديد: "${fullName}"`,
+            en: `New individual user registered: "${fullName}"`,
+          },
+          data: {
+            userId: user._id,
+            userName: fullName,
+            userPhone: user.phone,
+            type: "new_registration",
+          },
+          isRead: false,
+        });
+
+        logger.info(
+          `Admin notification sent for new individual user: ${fullName}`
+        );
+      } catch (notifError) {
+        logger.error("Failed to create admin notification:", notifError);
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -155,11 +198,9 @@ export const getNotificationPreferences = async (
     return res.status(200).json({
       success: true,
       data: user.notificationPreferences || {
-        offices: "all",
-        updates: "important",
-        categories: "all",
+        offices: "followed",
         enablePush: true,
-        enableEmail: true,
+        enableEmail: false,
         enableWhatsApp: false,
         enableSMS: false,
       },
@@ -178,15 +219,8 @@ export const updateNotificationPreferences = async (
   res: Response
 ): Promise<Response> => {
   try {
-    const {
-      offices,
-      updates,
-      categories,
-      enablePush,
-      enableEmail,
-      enableWhatsApp,
-      enableSMS,
-    } = req.body;
+    const { offices, enablePush, enableEmail, enableWhatsApp, enableSMS } =
+      req.body;
 
     const user = await User.findById(req.user?.userId);
 
@@ -199,20 +233,15 @@ export const updateNotificationPreferences = async (
 
     if (!user.notificationPreferences) {
       user.notificationPreferences = {
-        offices: "all",
-        updates: "important",
-        categories: "all",
+        offices: "followed",
         enablePush: true,
-        enableEmail: true,
+        enableEmail: false,
         enableWhatsApp: false,
         enableSMS: false,
       };
     }
 
     if (offices !== undefined) user.notificationPreferences.offices = offices;
-    if (updates !== undefined) user.notificationPreferences.updates = updates;
-    if (categories !== undefined)
-      user.notificationPreferences.categories = categories;
     if (enablePush !== undefined)
       user.notificationPreferences.enablePush = enablePush;
     if (enableEmail !== undefined)

@@ -10,22 +10,43 @@ export const getAllCategories = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { featured } = req.query;
+    const { featured, search, page = 1, limit = 100 } = req.query;
 
     const query: any = { isActive: true };
 
-    // Filter by featured if specified
     if (featured === "true") {
       query.isFeatured = true;
     }
 
+    if (search) {
+      const trimmedSearch = (search as string).trim();
+      if (trimmedSearch) {
+        const searchRegex = new RegExp(trimmedSearch, "i");
+        query.title = searchRegex;
+      }
+    }
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
     const categories = await Category.find(query)
       .select("-__v")
-      .sort({ order: 1, createdAt: 1 });
+      .sort({ order: 1, createdAt: 1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const total = await Category.countDocuments(query);
 
     res.status(200).json({
       success: true,
       data: categories,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error) {
     logger.error("Get all categories error:", error);

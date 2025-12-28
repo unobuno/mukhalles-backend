@@ -83,11 +83,17 @@ export const verifyOTPController = async (
     let hasBusiness = false;
     let businessData = null;
 
+    // Check if this is a completely NEW user who hasn't selected account type yet
+    // A user is "new" if they have no profile data at all (neither individual nor company)
+    const hasIndividualProfile = !!user.individualProfile?.fullName;
+    const business = await Business.findOne({ ownerId: user._id });
+    const needsAccountTypeSelection =
+      !hasIndividualProfile && !business && user.role === UserRole.INDIVIDUAL;
+
     if (user.role === UserRole.INDIVIDUAL) {
-      isProfileComplete = !!user.individualProfile?.fullName;
+      isProfileComplete = hasIndividualProfile;
     } else {
-      // Check if user has a Business entity
-      const business = await Business.findOne({ ownerId: user._id });
+      // Company user - use the business we already fetched above
       hasBusiness = !!business;
       isProfileComplete = hasBusiness;
       verificationStatus = business?.verificationStatus || null;
@@ -106,7 +112,7 @@ export const verifyOTPController = async (
     }
 
     logger.info(
-      `User ${user.phone} login: role=${user.role}, isProfileComplete=${isProfileComplete}, hasBusiness=${hasBusiness}, verificationStatus=${verificationStatus}`
+      `User ${user.phone} login: role=${user.role}, isProfileComplete=${isProfileComplete}, hasBusiness=${hasBusiness}, verificationStatus=${verificationStatus}, needsAccountTypeSelection=${needsAccountTypeSelection}`
     );
 
     const tokens = generateTokens({
@@ -126,6 +132,7 @@ export const verifyOTPController = async (
         isProfileComplete,
         verificationStatus,
         hasBusiness,
+        needsAccountTypeSelection,
         individualProfile: user.individualProfile,
         business: businessData,
       },

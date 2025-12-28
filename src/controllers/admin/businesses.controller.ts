@@ -124,6 +124,7 @@ export const createBusiness = async (
     });
 
     if (!ownerUser) {
+      // Create new user with company role
       ownerUser = await User.create({
         phone: delegate.phone,
         email: delegate.email,
@@ -143,6 +144,15 @@ export const createBusiness = async (
           },
         },
       });
+    } else {
+      // Update existing user's role to COMPANY if they were individual
+      if (ownerUser.role !== UserRole.COMPANY) {
+        ownerUser.role = UserRole.COMPANY;
+        await ownerUser.save();
+        logger.info(
+          `Updated user ${ownerUser.phone} role from individual to company`
+        );
+      }
     }
 
     const newBusiness = await Business.create({

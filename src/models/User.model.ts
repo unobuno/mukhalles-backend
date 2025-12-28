@@ -5,6 +5,8 @@ interface IIndividualProfile {
   fullName: string;
   email?: string;
   city?: string;
+  address?: string;
+  birthDate?: string;
   avatarUrl?: string;
   notificationChannel?: string;
   termsAccepted: boolean;
@@ -12,8 +14,6 @@ interface IIndividualProfile {
 
 interface INotificationPreferences {
   offices: string;
-  updates: string;
-  categories: string;
   enablePush: boolean;
   enableEmail: boolean;
   enableWhatsApp: boolean;
@@ -37,6 +37,8 @@ const IndividualProfileSchema = new Schema<IIndividualProfile>({
   fullName: { type: String },
   email: { type: String },
   city: { type: String },
+  address: { type: String },
+  birthDate: { type: String },
   avatarUrl: { type: String },
   notificationChannel: {
     type: String,
@@ -50,20 +52,10 @@ const NotificationPreferencesSchema = new Schema<INotificationPreferences>({
   offices: {
     type: String,
     enum: ["all", "followed", "none"],
-    default: "all",
-  },
-  updates: {
-    type: String,
-    enum: ["all", "important", "none"],
-    default: "important",
-  },
-  categories: {
-    type: String,
-    enum: ["all", "selected", "none"],
-    default: "all",
+    default: "followed",
   },
   enablePush: { type: Boolean, default: true },
-  enableEmail: { type: Boolean, default: true },
+  enableEmail: { type: Boolean, default: false },
   enableWhatsApp: { type: Boolean, default: false },
   enableSMS: { type: Boolean, default: false },
 });
