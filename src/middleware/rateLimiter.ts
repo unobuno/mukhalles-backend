@@ -43,3 +43,15 @@ export const searchLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// Contact form rate limiter - stricter to prevent spam
+export const contactLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 inquiries per 15 minutes per IP
+  message: {
+    success: false,
+    message: "طلبات تواصل كثيرة جداً. يرجى المحاولة لاحقاً.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
