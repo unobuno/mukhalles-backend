@@ -558,7 +558,16 @@ export const seedRealCategories = async (): Promise<void> => {
         await Category.create(categoryData);
         logger.info(`Created category: ${categoryData.title}`);
       } else {
-        logger.info(`Category already exists: ${categoryData.title}, skipping`);
+        // Update existing category with image if missing
+        if (!existing.imageUrl && categoryData.imageUrl) {
+          await Category.updateOne(
+            { id: categoryData.id },
+            { $set: { imageUrl: categoryData.imageUrl } }
+          );
+          logger.info(`Updated category image: ${categoryData.title}`);
+        } else {
+          logger.info(`Category already exists: ${categoryData.title}, skipping`);
+        }
       }
     }
 
@@ -589,9 +598,27 @@ export const seedRealOffices = async (): Promise<void> => {
       });
 
       if (existingBusiness) {
-        logger.info(
-          `Office already exists: ${officeData.name} (CR: ${officeData.crNumber}), skipping`
-        );
+        // Update existing business with images if missing
+        const updateFields: Record<string, string> = {};
+
+        if (!existingBusiness.avatarUrl && officeData.avatarUrl) {
+          updateFields.avatarUrl = officeData.avatarUrl;
+        }
+        if (!existingBusiness.coverUrl && officeData.coverUrl) {
+          updateFields.coverUrl = officeData.coverUrl;
+        }
+
+        if (Object.keys(updateFields).length > 0) {
+          await Business.updateOne(
+            { crNumber: officeData.crNumber },
+            { $set: updateFields }
+          );
+          logger.info(`Updated office images: ${officeData.name}`);
+        } else {
+          logger.info(
+            `Office already exists: ${officeData.name} (CR: ${officeData.crNumber}), skipping`
+          );
+        }
         continue;
       }
 
