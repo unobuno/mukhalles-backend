@@ -17,6 +17,7 @@ const realCategories = [
   {
     id: "import",
     title: "استيراد",
+    imageUrl: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80",
     isActive: true,
     isFeatured: true,
     order: 1,
@@ -24,6 +25,7 @@ const realCategories = [
   {
     id: "export",
     title: "تصدير",
+    imageUrl: "https://images.unsplash.com/photo-1494412574643-35d324698b93?auto=format&fit=crop&w=400&q=80",
     isActive: true,
     isFeatured: true,
     order: 2,
@@ -31,6 +33,7 @@ const realCategories = [
   {
     id: "vehicles",
     title: "مركبات",
+    imageUrl: "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=400&q=80",
     isActive: true,
     isFeatured: true,
     order: 3,
@@ -38,6 +41,7 @@ const realCategories = [
   {
     id: "fast",
     title: "تخليص سريع",
+    imageUrl: "https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&w=400&q=80",
     isActive: true,
     isFeatured: true,
     order: 4,
@@ -45,6 +49,7 @@ const realCategories = [
   {
     id: "other",
     title: "خدمات أخرى",
+    imageUrl: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=400&q=80",
     isActive: true,
     isFeatured: false,
     order: 5,
@@ -66,6 +71,8 @@ const realOffices = [
     ratingCount: 234,
     isFeatured: true,
     featuredPriority: 1,
+    avatarUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=300&q=80",
+    coverUrl: "https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=1200&q=80",
     verificationStatus: VerificationStatus.APPROVED,
     isActive: true,
     website: "https://aljazeera-customs.com.sa",
@@ -157,6 +164,8 @@ const realOffices = [
     ratingCount: 178,
     isFeatured: true,
     featuredPriority: 2,
+    avatarUrl: "https://images.unsplash.com/photo-1560179707-f14e90ef3623?auto=format&fit=crop&w=300&q=80",
+    coverUrl: "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=1200&q=80",
     verificationStatus: VerificationStatus.APPROVED,
     isActive: true,
     delegate: {
@@ -236,6 +245,8 @@ const realOffices = [
     ratingCount: 312,
     isFeatured: true,
     featuredPriority: 1,
+    avatarUrl: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=300&q=80",
+    coverUrl: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80",
     verificationStatus: VerificationStatus.APPROVED,
     isActive: true,
     website: "https://almamlaka-logistics.sa",
@@ -329,6 +340,8 @@ const realOffices = [
     ratingCount: 425,
     isFeatured: true,
     featuredPriority: 1,
+    avatarUrl: "https://images.unsplash.com/photo-1554469384-e58fac16e23a?auto=format&fit=crop&w=300&q=80",
+    coverUrl: "https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&w=1200&q=80",
     verificationStatus: VerificationStatus.APPROVED,
     isActive: true,
     website: "https://albarq-express.sa",
@@ -411,6 +424,8 @@ const realOffices = [
     ratingCount: 156,
     isFeatured: false,
     featuredPriority: 0,
+    avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80",
+    coverUrl: "https://images.unsplash.com/photo-1494412651409-8963ce7935a7?auto=format&fit=crop&w=1200&q=80",
     verificationStatus: VerificationStatus.APPROVED,
     isActive: true,
     delegate: {
