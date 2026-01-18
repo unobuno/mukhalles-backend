@@ -67,6 +67,17 @@ export const verifyOTP = async (
   otp: string,
   sessionId: string
 ): Promise<boolean> => {
+  // Bypass OTP for testing/app store reviews (controlled via env)
+  const bypassEnabled = process.env.OTP_BYPASS_ENABLED === "true";
+  const bypassCode = process.env.OTP_BYPASS_CODE || "000000";
+
+  if (bypassEnabled && otp === bypassCode) {
+    logger.info(`OTP bypass used for ${phone}`);
+    // Clean up any existing session
+    await OTPSession.deleteMany({ phone, sessionId });
+    return true;
+  }
+
   const session = await OTPSession.findOne({
     phone,
     sessionId,
