@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { Business, User, Category } from "../models";
+import { Business, User, Category, Review } from "../models";
 import logger from "../utils/logger";
 import {
   OfficeCategory,
@@ -478,6 +478,59 @@ const realOffices = [
   },
 ];
 
+// Saudi Arabic names for reviewers
+const saudiFirstNames = [
+  "أحمد", "محمد", "عبدالله", "خالد", "فهد", "سعود", "ناصر", "سلطان", "عمر", "يوسف",
+  "سارة", "نورة", "فاطمة", "مريم", "هند", "لمى", "ريم", "دانة", "لينا", "أمل",
+];
+
+const saudiLastNames = [
+  "العتيبي", "القحطاني", "الغامدي", "الزهراني", "الشمري", "الدوسري", "الحربي",
+  "المطيري", "العنزي", "السبيعي", "الرشيدي", "البلوي", "الجهني", "الشهري", "السلمي",
+];
+
+// Review texts with matching ratings
+const reviewTexts = [
+  { text: "خدمة ممتازة جداً! التخليص كان سريع والموظفين متعاونين جداً. أنصح بشدة بهم.", rating: 5 },
+  { text: "تجربة رائعة مع هذا المكتب. سرعة في الإنجاز ودقة في العمل. شكراً لكم.", rating: 5 },
+  { text: "خدمات تخليص احترافية تغطي جميع احتياجات الشركات. الفريق محترف وذو خبرة عالية.", rating: 4 },
+  { text: "استخدمت خدماتهم مرتين وكل مرة كانت النتيجة مرضية. التسعير معقول وجودة تنافسية.", rating: 4 },
+  { text: "الخدمة كانت جيدة بشكل عام ولكن هناك بعض التأخير في سرعة التواصل والرد.", rating: 3 },
+  { text: "خدمة ممتازة وخبرة في مجال التخليص الجمركي. أوصي بهم بشدة للشركات الناشئة.", rating: 5 },
+  { text: "تعاملت معهم في شحنة دولية وكانت التجربة ممتازة من البداية للنهاية. محترفين جداً!", rating: 5 },
+  { text: "المتابعة كانت ممتازة والتواصل مستمر طوال العملية. شكراً لهم على الاحترافية.", rating: 4 },
+  { text: "خدمة التخليص الجمركي كانت سريعة ومحترفة. أسعارهم تنافسية مقارنة بالسوق.", rating: 4 },
+  { text: "تجربة جيدة لكن كنت أتمنى سرعة أكثر في الرد على الاستفسارات والمتابعة.", rating: 3 },
+  { text: "فريق عمل محترف ومتعاون. ساعدوني في كل خطوة من العملية بصبر واهتمام.", rating: 5 },
+  { text: "أسعار معقولة وخدمة متميزة. سأتعامل معهم مرة أخرى بكل تأكيد إن شاء الله.", rating: 4 },
+  { text: "التعامل كان احترافي والموظفين كانوا متعاونين جداً في حل جميع المشاكل.", rating: 4 },
+  { text: "خدمة ممتازة في التخليص الجمركي. أنصح الجميع بالتعامل معهم بدون تردد.", rating: 5 },
+  { text: "تجربة مميزة! سرعة في الإنجاز ومتابعة دورية للشحنات. الأفضل في المنطقة.", rating: 5 },
+  { text: "خدمة متوسطة، كان هناك بعض التأخير لكن في النهاية تم إنجاز المطلوب.", rating: 3 },
+  { text: "ممتازين في التعامل مع الشحنات الكبيرة. لديهم خبرة واضحة في المجال.", rating: 5 },
+  { text: "سعيد جداً بالخدمة المقدمة. فريق محترف ومتابعة ممتازة للشحنة.", rating: 5 },
+];
+
+const serviceTags = [
+  "نقل سريع", "استيراد", "تصدير", "تخليص جمركي", "نقل دولي",
+  "خدمات متكاملة", "شحن بحري", "شحن جوي", "تخليص سيارات",
+];
+
+// Generate Saudi phone number
+const generateSaudiPhone = (): string => {
+  const prefixes = ["050", "053", "054", "055", "056", "057", "058", "059"];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const number = Math.floor(1000000 + Math.random() * 9000000);
+  return `+966${prefix.slice(1)}${number}`;
+};
+
+// Generate random name
+const generateName = (): string => {
+  const firstName = saudiFirstNames[Math.floor(Math.random() * saudiFirstNames.length)];
+  const lastName = saudiLastNames[Math.floor(Math.random() * saudiLastNames.length)];
+  return `${firstName} ${lastName}`;
+};
+
 // Seed categories with idempotent check (by unique id)
 export const seedRealCategories = async (): Promise<void> => {
   try {
@@ -567,11 +620,165 @@ export const seedRealOffices = async (): Promise<void> => {
   }
 };
 
+// Seed reviews for real offices with idempotent check
+export const seedRealReviews = async (): Promise<void> => {
+  try {
+    logger.info("Starting real reviews seeding...");
+
+    // Get all businesses (real offices)
+    const businesses = await Business.find({
+      crNumber: { $in: realOffices.map((o) => o.crNumber) },
+    });
+
+    if (businesses.length === 0) {
+      logger.info("No real offices found, skipping reviews seeding");
+      return;
+    }
+
+    logger.info(`Found ${businesses.length} real offices for reviews`);
+
+    // Check if reviews already exist for these businesses
+    const existingReviewsCount = await Review.countDocuments({
+      businessId: { $in: businesses.map((b) => b._id) },
+    });
+
+    if (existingReviewsCount > 0) {
+      logger.info(
+        `Reviews already exist for real offices (${existingReviewsCount} found), skipping`
+      );
+      return;
+    }
+
+    // Get or create individual users for reviews
+    let reviewers = await User.find({ role: UserRole.INDIVIDUAL }).limit(15);
+
+    if (reviewers.length < 10) {
+      logger.info("Creating individual users for reviews...");
+      const newUsers = [];
+
+      for (let i = 0; i < 15; i++) {
+        const phone = generateSaudiPhone();
+        // Check if phone already exists
+        const existingUser = await User.findOne({ phone });
+        if (existingUser) continue;
+
+        newUsers.push({
+          phone,
+          role: UserRole.INDIVIDUAL,
+          isActive: true,
+          isVerified: true,
+          individualProfile: {
+            fullName: generateName(),
+          },
+          createdAt: new Date(
+            Date.now() - Math.floor(Math.random() * 90) * 24 * 60 * 60 * 1000
+          ),
+        });
+      }
+
+      if (newUsers.length > 0) {
+        await User.insertMany(newUsers);
+        logger.info(`Created ${newUsers.length} individual users for reviews`);
+      }
+
+      reviewers = await User.find({ role: UserRole.INDIVIDUAL }).limit(15);
+    }
+
+    // Update reviewers without names
+    for (const reviewer of reviewers) {
+      if (!reviewer.individualProfile?.fullName) {
+        reviewer.individualProfile = {
+          ...reviewer.individualProfile,
+          fullName: generateName(),
+        };
+        await reviewer.save();
+      }
+    }
+
+    logger.info(`Using ${reviewers.length} reviewers for reviews`);
+
+    // Create reviews for each business
+    const reviews = [];
+    let reviewIndex = 0;
+
+    for (const business of businesses) {
+      // 4-6 reviews per business
+      const reviewCount = 4 + Math.floor(Math.random() * 3);
+
+      for (let i = 0; i < reviewCount; i++) {
+        const reviewData = reviewTexts[reviewIndex % reviewTexts.length];
+        const reviewer = reviewers[Math.floor(Math.random() * reviewers.length)];
+        const isApproved = Math.random() > 0.2; // 80% approved
+        const daysAgo = Math.floor(Math.random() * 60);
+
+        // Only approved reviews can have likes
+        const likesCount = isApproved ? Math.floor(Math.random() * 30) : 0;
+
+        reviews.push({
+          businessId: business._id,
+          userId: reviewer._id,
+          rating: reviewData.rating,
+          text: reviewData.text,
+          serviceTag: serviceTags[Math.floor(Math.random() * serviceTags.length)],
+          likes: [],
+          likesCount,
+          isApproved,
+          moderatedAt: isApproved
+            ? new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000 + 3600000)
+            : undefined,
+          createdAt: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
+        });
+
+        reviewIndex++;
+      }
+    }
+
+    await Review.insertMany(reviews);
+
+    const approvedCount = reviews.filter((r) => r.isApproved).length;
+    const pendingCount = reviews.filter((r) => !r.isApproved).length;
+
+    logger.info(`Created ${reviews.length} reviews`);
+    logger.info(`  - ${approvedCount} approved (with likes)`);
+    logger.info(`  - ${pendingCount} pending (0 likes)`);
+
+    // Update business ratings based on approved reviews
+    logger.info("Updating business ratings...");
+    for (const business of businesses) {
+      const businessReviews = await Review.find({
+        businessId: business._id,
+        isApproved: true,
+      });
+
+      const ratingCount = businessReviews.length;
+      const avgRating =
+        ratingCount > 0
+          ? businessReviews.reduce((sum, r) => sum + r.rating, 0) / ratingCount
+          : 0;
+
+      await Business.updateOne(
+        { _id: business._id },
+        { $set: { rating: Math.round(avgRating * 10) / 10, ratingCount } }
+      );
+
+      logger.info(
+        `  → ${business.name}: ${ratingCount} reviews, avg ${avgRating.toFixed(1)}⭐`
+      );
+    }
+
+    logger.info("Real reviews seeding completed");
+  } catch (error) {
+    logger.error("Error seeding real reviews:", error);
+    throw error;
+  }
+};
+
 // Main function to seed all real data
 export const seedAllRealData = async (): Promise<void> => {
   try {
     await seedRealCategories();
     await seedRealOffices();
+    await seedRealReviews();
     logger.info("All real data seeding completed successfully");
   } catch (error) {
     logger.error("Error during real data seeding:", error);
