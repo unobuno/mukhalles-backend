@@ -690,6 +690,7 @@ export const seedRealReviews = async (): Promise<void> => {
         reviewer.individualProfile = {
           ...reviewer.individualProfile,
           fullName: generateName(),
+          termsAccepted: reviewer.individualProfile?.termsAccepted ?? true,
         };
         await reviewer.save();
       }
