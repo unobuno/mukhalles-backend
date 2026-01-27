@@ -9,6 +9,9 @@ import { generateTokens, verifyRefreshToken } from "../utils/jwt";
 import { AuthRequest, UserRole } from "../types";
 import logger from "../utils/logger";
 
+// Saudi phone regex: 5xxxxxxxx (9 digits starting with 5)
+const SAUDI_PHONE_REGEX = /^5\d{8}$/;
+
 export const sendOTP = async (req: Request, res: Response): Promise<void> => {
   try {
     const { phone, countryCode } = req.body;
@@ -21,7 +24,17 @@ export const sendOTP = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const fullPhone = `${countryCode || "+966"}${phone}`;
+    // Validate Saudi phone format
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (!SAUDI_PHONE_REGEX.test(cleanPhone)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid phone number format. Must be a valid Saudi number (5xxxxxxxx)",
+      });
+      return;
+    }
+
+    const fullPhone = `${countryCode || "+966"}${cleanPhone}`;
     const { sessionId, otp } = await createOTPSession(fullPhone);
 
     logger.info(`OTP sent to ${fullPhone}`);
@@ -32,11 +45,28 @@ export const sendOTP = async (req: Request, res: Response): Promise<void> => {
       sessionId,
       ...(process.env.NODE_ENV === "development" && { otp }),
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error("Send OTP error:", error);
-    res.status(500).json({
+
+    // Handle specific error cases
+    const errorMessage = error.message || "";
+    let userMessage = "Failed to send OTP. Please try again.";
+    let statusCode = 500;
+
+    if (errorMessage.includes("Invalid phone") || errorMessage.includes("not a valid phone")) {
+      userMessage = "Invalid phone number";
+      statusCode = 400;
+    } else if (errorMessage.includes("rate limit") || errorMessage.includes("Max send attempts")) {
+      userMessage = "Too many attempts. Please try again later.";
+      statusCode = 429;
+    } else if (errorMessage.includes("not configured")) {
+      userMessage = "SMS service temporarily unavailable";
+      statusCode = 503;
+    }
+
+    res.status(statusCode).json({
       success: false,
-      message: "Failed to send OTP",
+      message: userMessage,
     });
   }
 };
@@ -56,7 +86,9 @@ export const verifyOTPController = async (
       return;
     }
 
-    const fullPhone = `${countryCode || "+966"}${phone}`;
+    // Clean phone to match sendOTP format
+    const cleanPhone = phone.replace(/\D/g, "");
+    const fullPhone = `${countryCode || "+966"}${cleanPhone}`;
     const isValid = await verifyOTP(fullPhone, otp, sessionId);
 
     if (!isValid) {
@@ -162,7 +194,9 @@ export const resendOTPController = async (
       return;
     }
 
-    const fullPhone = `${countryCode || "+966"}${phone}`;
+    // Clean phone to match sendOTP format
+    const cleanPhone = phone.replace(/\D/g, "");
+    const fullPhone = `${countryCode || "+966"}${cleanPhone}`;
     const success = await resendOTP(fullPhone, sessionId);
 
     if (!success) {
